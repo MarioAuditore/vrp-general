@@ -1,0 +1,15 @@
+[project]
+name = "vrp-study"
+version = "0.1.0"
+description = "python library for accelerating Vehicle Routing Problem (VRP) solutions"
+authors = [
+    {name = "Grenby, Elfat"}
+]
+
+readme = "README.md"
+
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
