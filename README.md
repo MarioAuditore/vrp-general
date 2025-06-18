@@ -28,8 +28,7 @@ https://www.sintef.no/projectweb/top/vrptw/homberger-benchmark/
 
 ### VRPPD (VRP with Pickup and Delivery)
 
-https://www.sintef.no/projectweb/top/pdptw/100-customers/
-
+https://www.sintef.no/projectweb/top/pdptw/
 
 ## Современные бенчмарки
 
