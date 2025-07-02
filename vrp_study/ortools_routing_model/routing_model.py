@@ -421,13 +421,16 @@ def do_solve(
 
 def find_optimal_paths(
         routing_manager: RoutingManager,
-        initial_solution_builder: Optional[InitialSolutionBuilder] = None
+        initial_solution_builder: Optional[InitialSolutionBuilder] = None,
+        init_solution=None
 ):
-    init_solution = None
+    init_solution = init_solution
     if initial_solution_builder is not None:
         init_solution = initial_solution_builder.get_initial_solution(routing_manager)
-        init_solution = [[n.id for n in s] for s in init_solution]
         log.info(f'use initial_solution: {len(init_solution)}')
+    if init_solution is not None:
+        id2index = {n.id:i for i,n in enumerate(routing_manager.nodes())}
+        init_solution = [[id2index[n.id] for n in s] for s in init_solution]
 
     log.info(f'problem size: {len(routing_manager.nodes())}')
     score, solution, times = do_solve(

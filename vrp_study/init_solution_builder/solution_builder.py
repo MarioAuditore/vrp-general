@@ -25,6 +25,8 @@ from ..data_model import Cargo
 #             s = s[1:-1]
 #         yield [routing_manager._node_to_inner_node[sub_manager.nodes()[index].routing_node].id for index in s]
 
+def get_epsilon(g: nx.Graph, path: list[int]):
+    pass
 
 @dataclasses.dataclass
 class SolutionBuilder(InitialSolutionBuilder):
@@ -63,7 +65,7 @@ class SolutionBuilder(InitialSolutionBuilder):
                 cost = min((l1 - l0) / l0, 2)
                 cost = np.exp(cost)
                 # print(l)
-                if cost < 2:
+                if cost < 1.75:
                     if (a.id, c.id) in cg.edges():
                         cg.edges()[a.id, c.id]['length'] = min(cost, cg.edges()[a.id, c.id]['length'])
                     else:
@@ -100,10 +102,11 @@ class SolutionBuilder(InitialSolutionBuilder):
 
             for i, c in enumerate(cms):
                 nodes = [ccc for cc in c for ccc in start2end[cc]]
+                cars = [car for car in routing_manager.cars() if car.id not in car2path]
 
                 part = routing_manager.sub_problem(
                     nodes,
-                    [car for car in routing_manager.cars() if car.id not in car2path],
+                    cars,
                     ModelConfig(max_solution_number=50, max_execution_time_minutes=0.5))
 
                 solution = find_optimal_paths(part)[0]
@@ -113,6 +116,34 @@ class SolutionBuilder(InitialSolutionBuilder):
                                                        part.nodes()[point].id not in {part.cars()[i].start_node.id,
                                                                                       part.cars()[i].end_node.id}]
                 log.info(solution)
+                if i > 0:
+                    cars = [car for car in routing_manager.cars() if car.id in car2path]
+                    nodes = [p for path in car2path.values() for p in path]
+
+                    part = routing_manager.sub_problem(
+                        nodes,
+                        cars,
+                        ModelConfig(max_solution_number=50, max_execution_time_minutes=0.5)
+                    )
+
+                    solution = []
+                    for i, car in enumerate(routing_manager.cars()):
+                        if car.id in car2path:
+                            solution.append(car2path[car.id])
+                        # else:
+                        #     solution.append([])
+                    solution = find_optimal_paths(part, init_solution=solution)[0]
+                    for i, s in enumerate(solution):
+                        if len(s) > 0:
+                            car2path[part.cars()[i].id] = [part.nodes()[point] for point in s if
+                                                           part.nodes()[point].id not in {part.cars()[i].start_node.id,
+                                                                                          part.cars()[i].end_node.id}]
+                        else:
+                            del car2path[part.cars()[i].id]
+
+
+
+
         solution = []
         for i, car in enumerate(routing_manager.cars()):
             if car.id in car2path:
