@@ -5,12 +5,13 @@ from typing import List
 import networkx as nx
 import numpy as np
 from loguru import logger as log
+from tqdm.auto import tqdm
 
-from ..configs import ModelConfig
-from ..initial_solution_builder import InitialSolutionBuilder
-from ..routing_manager import RoutingManager, InnerNode, PDRoutingManager
-from ..ortools_routing_model.routing_model import find_optimal_paths
-from ..data_model import Cargo
+from vrp_study.configs import ModelConfig
+from vrp_study.initial_solution_builder import InitialSolutionBuilder
+from vrp_study.routing_manager import RoutingManager, InnerNode, PDRoutingManagerBuilder
+from vrp_study.ortools_routing_model_pdptw.routing_model import find_optimal_paths
+from vrp_study.data_model import Cargo
 
 
 # def solve_sub_cargos(cargos, routing_manager, init_sols=None):
@@ -100,7 +101,7 @@ class SolutionBuilder(InitialSolutionBuilder):
                 if iterations == 10:
                     break
 
-            for i, c in enumerate(cms):
+            for i, c in enumerate(tqdm(cms)):
                 nodes = [ccc for cc in c for ccc in start2end[cc]]
                 cars = [car for car in routing_manager.cars() if car.id not in car2path]
 
@@ -116,14 +117,14 @@ class SolutionBuilder(InitialSolutionBuilder):
                                                        part.nodes()[point].id not in {part.cars()[i].start_node.id,
                                                                                       part.cars()[i].end_node.id}]
                 log.info(solution)
-                if i > 0:
+                if i > 0 and i % 7 ==0:
                     cars = [car for car in routing_manager.cars() if car.id in car2path]
                     nodes = [p for path in car2path.values() for p in path]
 
                     part = routing_manager.sub_problem(
                         nodes,
                         cars,
-                        ModelConfig(max_solution_number=50, max_execution_time_minutes=0.5)
+                        ModelConfig(max_execution_time_minutes=0.5)
                     )
 
                     solution = []
