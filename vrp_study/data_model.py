@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, TypeVar, Generic
 
 """
 Описание основных моделей данных для модели
@@ -104,11 +104,13 @@ class Tariff:
     max_count: int = field(hash=False, default=-1)
 
 
+T = TypeVar('T')  # хз зачем тут это, но по приколу оставлю
+
 @dataclass
-class Route:
+class Route(Generic[T]):
     """
         Класс маршрута
     """
     id: int = field(hash=True)  # идентиификатор маршрута
-    path: list[object] = field(hash=False)  # путь
+    path: list[T] = field(hash=False)  # путь в нодах или любой другом типе
     tariff: Tariff = field(hash=False)  # тип машины на данном маршруту

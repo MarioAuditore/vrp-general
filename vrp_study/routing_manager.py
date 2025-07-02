@@ -5,7 +5,7 @@ from loguru import logger as log
 import numpy as np
 
 from .configs import ModelConfig
-from .data_model import Tariff, Cargo, Node
+from .data_model import Tariff, Cargo, Node, Route
 from .data_model import TariffCost
 
 
@@ -161,10 +161,8 @@ class RoutingManagerBuilder(ABC):
         return self._build()
 
     def _validate(self):
-        pass
-        # starts = {crg.nodes[0].address for crg in self._cargos}
-        # if len(starts) != 1:
-        #     raise Exception()
+        # todo сделать валидатор
+        raise NotImplementedError
 
     def _build(self) -> RoutingManager:
 
@@ -227,3 +225,7 @@ class RoutingManagerBuilder(ABC):
         self._np_dsts = dsts
         self._np_time = time
 
+
+def convert_solution(solution: List[List[InnerNode]]) -> List[Route[Node]]:
+    # todo сделать конвертер
+    raise NotImplementedError
