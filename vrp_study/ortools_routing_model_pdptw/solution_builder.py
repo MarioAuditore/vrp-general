@@ -9,7 +9,8 @@ from tqdm.auto import tqdm
 
 from vrp_study.configs import ModelConfig
 from vrp_study.initial_solution_builder import InitialSolutionBuilder
-from vrp_study.routing_manager import RoutingManager, InnerNode, PDRoutingManagerBuilder
+from vrp_study.routing_manager import RoutingManager, InnerNode
+from .pdptw_routing_manager_builder import PDRoutingManagerBuilder
 from vrp_study.ortools_routing_model_pdptw.routing_model import find_optimal_paths
 from vrp_study.data_model import Cargo
 
