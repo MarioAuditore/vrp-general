@@ -24,14 +24,17 @@ class SolutionCallback:
     def __init__(self, routing: pywrapcp.RoutingModel):
         self.model = routing
         self._best_objective = 1e10
+        self.count = 0
         self.lock = Lock()
 
     def __call__(self):
         with self.lock:
+            self.count+=1
+            count = self.count
             value = self.model.CostVar().Max()
             self._best_objective = min(self._best_objective, value)
             best = self._best_objective
-        log.debug(f'find new solution: {value}, best solution: {best}')
+        log.debug(f'find new solution ({count}): {value}, best solution: {best}')
 
 
 def get_optimal_model_params() -> pywrapcp.DefaultRoutingSearchParameters:
