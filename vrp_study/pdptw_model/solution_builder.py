@@ -11,7 +11,7 @@ from vrp_study.configs import ModelConfig
 from vrp_study.initial_solution_builder import InitialSolutionBuilder
 from vrp_study.routing_manager import RoutingManager, InnerNode
 from .pdptw_routing_manager_builder import PDRoutingManagerBuilder
-from vrp_study.ortools_routing_model_pdptw.routing_model import find_optimal_paths
+from vrp_study.pdptw_model.routing_model import find_optimal_paths
 from vrp_study.data_model import Cargo
 
 
@@ -30,10 +30,11 @@ from vrp_study.data_model import Cargo
 def get_epsilon(g: nx.Graph, path: list[int]):
     pass
 
+
 @dataclasses.dataclass
 class SolutionBuilder(InitialSolutionBuilder):
     max_problem_size: int = 25
-
+    inverse_weight : bool = False
     def get_initial_solution(self, routing_manager: RoutingManager) -> List[List[InnerNode]]:
         cg = nx.Graph()
         start2end: dict[int, list[InnerNode]] = {}
@@ -118,7 +119,7 @@ class SolutionBuilder(InitialSolutionBuilder):
                                                        part.nodes()[point].id not in {part.cars()[i].start_node.id,
                                                                                       part.cars()[i].end_node.id}]
                 log.info(solution)
-                if i > 0 and i % 7 ==0:
+                if i > 0 and i % 7 == 0:
                     cars = [car for car in routing_manager.cars() if car.id in car2path]
                     nodes = [p for path in car2path.values() for p in path]
 
@@ -142,9 +143,6 @@ class SolutionBuilder(InitialSolutionBuilder):
                                                                                           part.cars()[i].end_node.id}]
                         else:
                             del car2path[part.cars()[i].id]
-
-
-
 
         solution = []
         for i, car in enumerate(routing_manager.cars()):

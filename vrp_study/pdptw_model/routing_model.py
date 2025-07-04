@@ -29,7 +29,7 @@ class SolutionCallback:
 
     def __call__(self):
         with self.lock:
-            self.count+=1
+            self.count += 1
             count = self.count
             value = self.model.CostVar().Max()
             self._best_objective = min(self._best_objective, value)
@@ -358,9 +358,7 @@ def do_solve(
     """
         Описание основной проблемы.
     :param routing_manager: менежер
-    :param initial_solution_builder
-    :param time: Ограничение по времени, по умолчанию DEFAULT_MINUTES_FOR_MODEL.
-    :param solution_limit: Ограничение на кол-во найденных решений.
+    :param init_solution: init_solution
     :param search_parameters:  Параметры поиска, по умолчанию берутся из get_optimal_model_params()
     :return:  Либо картеж (скор, список путей, где путь это лист индексов посещенных нод) если решение найдено,
      либо None если не найдено.
@@ -432,7 +430,7 @@ def find_optimal_paths(
         init_solution = initial_solution_builder.get_initial_solution(routing_manager)
         log.info(f'use initial_solution: {len(init_solution)}')
     if init_solution is not None:
-        id2index = {n.id:i for i,n in enumerate(routing_manager.nodes())}
+        id2index = {n.id: i for i, n in enumerate(routing_manager.nodes())}
         init_solution = [[id2index[n.id] for n in s] for s in init_solution]
 
     log.info(f'problem size: {len(routing_manager.nodes())}')
