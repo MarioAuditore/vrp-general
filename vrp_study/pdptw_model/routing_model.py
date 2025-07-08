@@ -6,12 +6,12 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from ortools.util.optional_boolean_pb2 import BOOL_FALSE, BOOL_TRUE
 
 from ..initial_solution_builder import InitialSolutionBuilder
-
-__all__ = [
-    'find_optimal_paths'
-]
-
 from ..routing_manager import RoutingManager
+
+# __all__ = [
+#     'find_optimal_paths'
+# ]
+
 
 """
 Верхняя граница расстояния для машины в метрах
@@ -34,7 +34,8 @@ class SolutionCallback:
             value = self.model.CostVar().Max()
             self._best_objective = min(self._best_objective, value)
             best = self._best_objective
-        log.debug(f'find new solution ({count}): {value}, best solution: {best}')
+        log.debug(
+            f'find new solution ({count}): {value}, best solution: {best}')
 
 
 def get_optimal_model_params() -> pywrapcp.DefaultRoutingSearchParameters:
@@ -122,6 +123,7 @@ def get_solution(routing_manager: RoutingManager, manager, routing, solution) ->
     result = []
     time_result = []
     time_dim = routing.GetDimensionOrDie('time')
+    
     for vehicle_id, car in enumerate(routing_manager.cars()):
         if not routing.IsVehicleUsed(solution, vehicle_id):
             result.append([])
@@ -137,7 +139,8 @@ def get_solution(routing_manager: RoutingManager, manager, routing, solution) ->
             times.append((solution.Min(time_var), solution.Max(time_var)))
             previous_index = index
             index = solution.Value(routing.NextVar(index))
-            route_cost += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
+            route_cost += routing.GetArcCostForVehicle(
+                previous_index, index, vehicle_id)
         route_cost += routing.GetFixedCostOfVehicle(vehicle_id)
         path.append(manager.IndexToNode(index))
         time_var = time_dim.CumulVar(index)
@@ -176,7 +179,8 @@ def add_mass_constraint(
     routing.AddDimensionWithVehicleCapacity(
         routing.RegisterUnaryTransitCallback(demand_mass_callback),
         0,  # null capacity slack
-        [car.capacity for car in routing_manager.cars()],  # vehicle maximum capacities
+        # vehicle maximum capacities
+        [car.capacity for car in routing_manager.cars()],
         True,  # start cumul to zero
         "Capacity_mass"
     )
@@ -204,8 +208,10 @@ def add_time_window(
 
     routing.AddDimension(
         transit_callback_index,
-        max(node.end_time for node in routing_manager.nodes()),  # allow waiting time
-        max(node.end_time for node in routing_manager.nodes()),  # maximum time per vehicle
+        # allow waiting time
+        max(node.end_time for node in routing_manager.nodes()),
+        # maximum time per vehicle
+        max(node.end_time for node in routing_manager.nodes()),
         False,  # Don't force start cumul to zero.
         time_dimension_name,
     )
@@ -247,7 +253,8 @@ def add_vehicles_cost(routing_manager: RoutingManager,
         to_node = routing_manager.nodes()[manager.IndexToNode(to_index)]
         return int(routing_manager.get_distance(from_node, to_node) * 100)
 
-    routing.SetArcCostEvaluatorOfAllVehicles(routing.RegisterTransitCallback(cost_callback))
+    routing.SetArcCostEvaluatorOfAllVehicles(
+        routing.RegisterTransitCallback(cost_callback))
 
 
 def add_pick_up_and_delivery(
@@ -272,7 +279,8 @@ def add_pick_up_and_delivery(
             routing.AddPickupAndDelivery(pickup_index, delivery_index)
             # поднять и сбросить груз должна одна машина.
             routing.solver().Add(
-                routing.VehicleVar(pickup_index) == routing.VehicleVar(delivery_index)
+                routing.VehicleVar(
+                    pickup_index) == routing.VehicleVar(delivery_index)
             )
             # номер ноды c "поднятием" груза раньше ноды со "сбрасыванием" груза
             routing.solver().Add(
@@ -321,6 +329,7 @@ def add_distance_dimension(routing_manager: RoutingManager,
 def add_count_dimension(
         routing_manager: RoutingManager,
         routing: pywrapcp.RoutingModel,
+        manager: pywrapcp.RoutingIndexManager = None,
         count_dimension_name: str = 'count'):
     """
     Добавление размерности для пройденного расстояния.
@@ -349,97 +358,113 @@ def add_count_dimension(
     return count_dimension
 
 
-def do_solve(
-        routing_manager: RoutingManager,
-        *,
-        search_parameters: Optional[pywrapcp.DefaultRoutingSearchParameters] = None,
-        init_solution=None
-) -> Optional[tuple[float, list[list[int]], list[list[int]]]]:
-    """
-        Описание основной проблемы.
-    :param routing_manager: менежер
-    :param init_solution: init_solution
-    :param search_parameters:  Параметры поиска, по умолчанию берутся из get_optimal_model_params()
-    :return:  Либо картеж (скор, список путей, где путь это лист индексов посещенных нод) если решение найдено,
-     либо None если не найдено.
-    """
-
-    # Create the routing index manager.
-    manager = pywrapcp.RoutingIndexManager(
-        len(routing_manager.nodes()),
-        len(routing_manager.cars()),
-        routing_manager.starts_ids(),
-        routing_manager.ends_ids()
-    )
-    log.info("Начало создания модели")
-    routing = pywrapcp.RoutingModel(manager)
-
-    add_distance_dimension(routing_manager, routing, manager)
-    add_count_dimension(routing_manager, routing)
-
-    add_pick_up_and_delivery(routing_manager, routing, manager)
-    add_vehicles_cost(routing_manager, routing, manager)
-    add_time_window(routing_manager, routing, manager)
-
-    add_mass_constraint(routing_manager, routing, manager)
-
-    conf = routing_manager.get_model_config()
-
-    if not search_parameters:
-        search_parameters = get_optimal_model_params()
-        search_parameters.time_limit.seconds = int(60 * conf.max_execution_time_minutes)
-        if conf.max_solution_number > 0:
-            search_parameters.solution_limit = conf.max_solution_number
-
-    search_parameters.log_search = False
-
-    routing.AddAtSolutionCallback(SolutionCallback(routing))
-
-    routing.CloseModelWithParameters(search_parameters)
-
-    log.info(f'Начало решения')
-    if init_solution is not None:
-        sols = init_solution
-        log.info(f'use initial_solution: {len(sols)}')
-        assignment = routing.ReadAssignmentFromRoutes(sols, True)
-        if not assignment:
-            log.warning(f'Bad Initial Solutions: {sols}')
-        solution = routing.SolveFromAssignmentWithParameters(
-            assignment, search_parameters
-        )
-    else:
-        solution = routing.SolveWithParameters(
-            search_parameters
-        )
-
-    if solution:
-        log.info(f'find solution')
-        return get_solution(routing_manager, manager, routing, solution)
-    else:
-        log.warning("No solution found !")
-        return None
+PDP_CONSTRAINTS = [
+    add_distance_dimension,
+    add_count_dimension,
+    add_pick_up_and_delivery,
+    add_vehicles_cost,
+    add_time_window,
+    add_mass_constraint
+]
 
 
-def find_optimal_paths(
-        routing_manager: RoutingManager,
-        initial_solution_builder: Optional[InitialSolutionBuilder] = None,
-        init_solution=None
-):
-    init_solution = init_solution
-    if initial_solution_builder is not None:
-        init_solution = initial_solution_builder.get_initial_solution(routing_manager)
-        log.info(f'use initial_solution: {len(init_solution)}')
-    if init_solution is not None:
-        id2index = {n.id: i for i, n in enumerate(routing_manager.nodes())}
-        init_solution = [[id2index[n.id] for n in s] for s in init_solution]
+'''
+--- РЕСТРУКТУРИЗАЦИЯ ---
+'''
 
-    log.info(f'problem size: {len(routing_manager.nodes())}')
-    score, solution, times = do_solve(
-        routing_manager,
-        init_solution=init_solution
-    )
-    log.info(f"best_score: {len([s for s in solution if len(s) > 0])}")
+# def do_solve(
+#         routing_manager: RoutingManager,
+#         *,
+#         search_parameters: Optional[pywrapcp.DefaultRoutingSearchParameters] = None,
+#         init_solution=None
+# ) -> Optional[tuple[float, list[list[int]], list[list[int]]]]:
+#     """
+#         Описание основной проблемы.
+#     :param routing_manager: менежер
+#     :param init_solution: init_solution
+#     :param search_parameters:  Параметры поиска, по умолчанию берутся из get_optimal_model_params()
+#     :return:  Либо картеж (скор, список путей, где путь это лист индексов посещенных нод) если решение найдено,
+#      либо None если не найдено.
+#     """
 
-    log.info(f"best_score: {score / 100:.2f}")
+#     # Create the routing index manager.
+#     manager = pywrapcp.RoutingIndexManager(
+#         len(routing_manager.nodes()),
+#         len(routing_manager.cars()),
+#         routing_manager.starts_ids(),
+#         routing_manager.ends_ids()
+#     )
+#     log.info("Начало создания модели")
+#     routing = pywrapcp.RoutingModel(manager)
 
-    return solution, times
+#     add_distance_dimension(routing_manager, routing, manager)
+#     add_count_dimension(routing_manager, routing)
+
+#     add_pick_up_and_delivery(routing_manager, routing, manager)
+#     add_vehicles_cost(routing_manager, routing, manager)
+#     add_time_window(routing_manager, routing, manager)
+
+#     add_mass_constraint(routing_manager, routing, manager)
+
+#     conf = routing_manager.get_model_config()
+
+#     if not search_parameters:
+#         search_parameters = get_optimal_model_params()
+#         search_parameters.time_limit.seconds = int(
+#             60 * conf.max_execution_time_minutes)
+#         if conf.max_solution_number > 0:
+#             search_parameters.solution_limit = conf.max_solution_number
+
+#     search_parameters.log_search = False
+
+#     routing.AddAtSolutionCallback(SolutionCallback(routing))
+
+#     routing.CloseModelWithParameters(search_parameters)
+
+#     log.info(f'Начало решения')
+#     if init_solution is not None:
+#         sols = init_solution
+#         log.info(f'use initial_solution: {len(sols)}')
+#         assignment = routing.ReadAssignmentFromRoutes(sols, True)
+#         if not assignment:
+#             log.warning(f'Bad Initial Solutions: {sols}')
+#         solution = routing.SolveFromAssignmentWithParameters(
+#             assignment, search_parameters
+#         )
+#     else:
+#         solution = routing.SolveWithParameters(
+#             search_parameters
+#         )
+
+#     if solution:
+#         log.info(f'find solution')
+#         return get_solution(routing_manager, manager, routing, solution)
+#     else:
+#         log.warning("No solution found !")
+#         return None
+
+
+# def find_optimal_paths(
+#         routing_manager: RoutingManager,
+#         initial_solution_builder: Optional[InitialSolutionBuilder] = None,
+#         init_solution=None
+# ):
+#     init_solution = init_solution
+#     if initial_solution_builder is not None:
+#         init_solution = initial_solution_builder.get_initial_solution(
+#             routing_manager)
+#         log.info(f'use initial_solution: {len(init_solution)}')
+#     if init_solution is not None:
+#         id2index = {n.id: i for i, n in enumerate(routing_manager.nodes())}
+#         init_solution = [[id2index[n.id] for n in s] for s in init_solution]
+
+#     log.info(f'problem size: {len(routing_manager.nodes())}')
+#     score, solution, times = do_solve(
+#         routing_manager,
+#         init_solution=init_solution
+#     )
+#     log.info(f"best_score: {len([s for s in solution if len(s) > 0])}")
+
+#     log.info(f"best_score: {score / 100:.2f}")
+
+#     return solution, times

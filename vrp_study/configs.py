@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Optional, Tuple
 
 
 @dataclass
@@ -11,4 +12,4 @@ class ModelConfig:
 
 @dataclass
 class ConstraintConfig:
-    ...
+    constraints: List

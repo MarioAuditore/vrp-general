@@ -33,8 +33,10 @@ def get_epsilon(g: nx.Graph, path: list[int]):
 
 @dataclasses.dataclass
 class SolutionBuilder(InitialSolutionBuilder):
+    
     max_problem_size: int = 25
     inverse_weight : bool = False
+    
     def get_initial_solution(self, routing_manager: RoutingManager) -> List[List[InnerNode]]:
         cg = nx.Graph()
         start2end: dict[int, list[InnerNode]] = {}

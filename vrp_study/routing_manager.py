@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Dict, Tuple, List, Optional
-from loguru import logger as log
+from typing import Dict, Iterable, List, Optional, Tuple
+
 import numpy as np
+from loguru import logger as log
 
 from .configs import ModelConfig
-from .data_model import Tariff, Cargo, Node
-from .data_model import TariffCost
+from .data_model import Cargo, Node, Route, Tariff, TariffCost
 
 
 @dataclass
@@ -69,7 +69,8 @@ class RoutingManager:
 
     def get_pick_up_and_delivery_nodes(self) -> List[List[int]]:
         node_id2index = {n.id: i for i, n in enumerate(self._inner_nodes)}
-        res = [[node_id2index[n.id] for n in pdp.nodes] for pdp in self._pick_up_and_delivery_nodes]
+        res = [[node_id2index[n.id] for n in pdp.nodes]
+               for pdp in self._pick_up_and_delivery_nodes]
         return res
 
     def get_depo_index(self) -> int:
@@ -90,7 +91,8 @@ class RoutingManager:
             _time=self._time,
             _inner_nodes=nodes,
             _inner_cars=cars,
-            _pick_up_and_delivery_nodes=[pdp for pdp in self._pick_up_and_delivery_nodes if pdp.id in pdp_ids],
+            _pick_up_and_delivery_nodes=[
+                pdp for pdp in self._pick_up_and_delivery_nodes if pdp.id in pdp_ids],
             _depo_index=self._depo_index
         )
         return res
@@ -103,7 +105,8 @@ class RoutingManagerBuilder(ABC):
                  model_config: Optional[ModelConfig] = None
                  ):
 
-        self.distance_matrix: Dict[Tuple[object, object], float] = distance_matrix
+        self.distance_matrix: Dict[Tuple[object,
+                                         object], float] = distance_matrix
         self.time_matrix: Dict[Tuple[object, object], float] = time_matrix
 
         if model_config is None:
@@ -121,6 +124,8 @@ class RoutingManagerBuilder(ABC):
         self._inner_cars: List[InnerCar] = []
 
         self._pdp: List[Pdp] = []
+
+        self._depo: Optional[Node] = None
 
     def cargos(self) -> List[Cargo]:
         return self._cargos
@@ -151,21 +156,24 @@ class RoutingManagerBuilder(ABC):
         for c in cargos:
             self.add_cargo(c)
 
+    def add_depo(self, depo: Node):
+        self._depo = depo
+
     def build(self) -> RoutingManager:
         self._validate()
         return self._build()
 
     def _validate(self):
-        pass
-        # starts = {crg.nodes[0].address for crg in self._cargos}
-        # if len(starts) != 1:
-        #     raise Exception()
+        # todo сделать валидатор
+        # raise NotImplementedError
+        ...
 
     def _build(self) -> RoutingManager:
 
         self._create_inner_nodes()
 
-        self._node_to_inner_node = {n.routing_node: n for n in self._inner_nodes if n.routing_node is not None}
+        self._node_to_inner_node = {
+            n.routing_node: n for n in self._inner_nodes if n.routing_node is not None}
 
         self._create_inner_cars()
 
@@ -217,86 +225,13 @@ class RoutingManagerBuilder(ABC):
                     continue
                 if n1.routing_node.id == n2.routing_node.id:
                     continue
-                dsts[i, j] = self.distance_matrix[n1.routing_node.id, n2.routing_node.id]
+                dsts[i, j] = self.distance_matrix[n1.routing_node.id,
+                                                  n2.routing_node.id]
                 time[i, j] = self.time_matrix[n1.routing_node.id, n2.routing_node.id]
         self._np_dsts = dsts
         self._np_time = time
 
 
-class PDRoutingManager(RoutingManagerBuilder):
-
-    def __init__(
-            self,
-            distance_matrix: Dict[Tuple[object, object], float],
-            time_matrix: Dict[Tuple[object, object], float],
-            model_config: Optional[ModelConfig] = None
-    ):
-        super().__init__(
-            distance_matrix=distance_matrix,
-            time_matrix=time_matrix,
-            model_config=model_config
-        )
-        self._start_node: Optional[InnerNode] = None
-        self._common_end_node: Optional[InnerNode] = None
-        self._depo: Optional[Node] = None
-
-    def add_depo(self, depo: Node):
-        self._depo = depo
-
-    def get_depo_inner_node(self):
-        return self._start_node
-
-    def _create_inner_nodes(self):
-        start_node = InnerNode(
-            id=0,
-            start_time=self._depo.start_time,
-            end_time=self._depo.end_time,
-            service_time=0,
-            demand=0,
-            is_transit=False,
-            routing_node=self._depo
-        )
-        self._start_node = start_node
-        self._common_end_node = start_node
-        self._inner_nodes.append(start_node)
-
-        for crg in self._cargos:
-            nodes = [
-                InnerNode(
-                    id=len(self._inner_nodes) + i,
-                    service_time=crg.nodes[i].service_time,
-                    start_time=crg.nodes[i].start_time,
-                    end_time=crg.nodes[i].end_time,
-                    demand=crg.nodes[i].capacity,
-                    is_transit=True,
-                    routing_node=crg.nodes[i]
-                )
-                for i in range(2)
-            ]
-            self._inner_nodes += nodes
-            for n in nodes:
-                n.pdp_id = len(self._pdp)
-            self._pdp.append(Pdp(
-                id=len(self._pdp),
-                nodes=nodes
-            ))
-
-    def _create_inner_cars(self):
-        cars: List[InnerCar] = []
-        for tariff in self._tariffs:
-            count = tariff.max_count
-            for i in range(count):
-                for tc in tariff.cost_per_distance:
-                    # дублирование автопарка, чтобы использовать все имеющиеся машины
-                    cars.append(
-                        InnerCar(
-                            id=len(cars),
-                            tariff=tariff,
-                            capacity=tariff.capacity,
-                            tariff_cost=tc,
-                            start_node=self._start_node,
-                            end_node=self._common_end_node,
-                            use_when_empty=False
-                        ))
-
-        self._inner_cars = cars
+def convert_solution(solution: List[List[InnerNode]]) -> List[Route[Node]]:
+    # todo сделать конвертер
+    raise NotImplementedError
